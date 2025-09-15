@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finarium Budget Tracker</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN for charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Firebase CDN scripts for a full-stack application -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, onSnapshot, query, where, doc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        window.firebase = { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, collection, addDoc, getDocs, onSnapshot, query, where, doc, deleteDoc, setDoc };
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f4ed; /* Lace */
+            color: #0b1957; /* Midnight */
+        }
+
+        .nav-item.active {
+            background-color: #e8d9ed; /* Petal */
+            color: #426bc2; /* Sapphire */
+            font-weight: 600;
+        }
+
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        /* Custom scrollbar for tables */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: #d2b3db; /* Lavender */
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background-color: #f7f4ed; /* Lace */
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="flex flex-col md:flex-row min-h-screen">
+        <!-- Left Panel / Sidebar -->
+        <aside class="w-full md:w-64 bg-white shadow-xl flex flex-col fixed inset-x-0 bottom-0 md:relative md:inset-x-auto md:inset-y-auto md:left-auto md:flex-shrink-0 z-50 rounded-t-2xl md:rounded-t-none md:rounded-r-2xl">
+            <div class="hidden md:flex flex-col items-center p-6 border-b border-gray-100">
+                <!-- Mascot & Thought Bubble -->
+                <div class="relative mb-4">
+                    <img src="mascot.gif" alt="Your Mascot" class="rounded-full shadow-lg">
+                    <div id="mascot-bubble" class="absolute top-16 -right-16 bg-white border border-gray-300 rounded-lg p-2 text-xs text-gray-700 shadow-md transform -rotate-3 transition-opacity duration-300 ease-in-out w-32">
+                        Welcome back!
+                    </div>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800">Finarium</h1>
+            </div>
+            
+            <div id="user-info" class="flex items-center justify-center md:justify-start p-4 bg-gray-50 text-xs md:text-sm text-gray-600 border-b border-gray-200">
+                <span id="user-status" class="truncate">Connecting...</span>
+            </div>
+
+            <nav class="flex md:flex-col justify-around md:justify-start flex-grow p-2 md:p-4 space-x-2 md:space-x-0 md:space-y-2">
+                <button data-tab="dashboard" class="nav-item flex items-center justify-center md:justify-start flex-grow md:flex-none p-3 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors duration-200 text-xs md:text-base">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-0 md:mr-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    <span class="hidden md:inline">Dashboard</span>
+                </button>
+                <button data-tab="income" class="nav-item flex items-center justify-center md:justify-start flex-grow md:flex-none p-3 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors duration-200 text-xs md:text-base">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-0 md:mr-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 8 8 10z"></path>
+                        <polyline points="12 5 12 12 12 12"></polyline>
+                        <line x1="12" y1="12" x2="16" y2="16"></line>
+                        <line x1="12" y1="12" x2="8" y2="16"></line>
+                    </svg>
+                    <span class="hidden md:inline">Income</span>
+                </button>
+                <button data-tab="outflows" class="nav-item flex items-center justify-center md:justify-start flex-grow md:flex-none p-3 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors duration-200 text-xs md:text-base">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-0 md:mr-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 10h18M7 15h1m4 0h1m4 0h1M19 19H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <span class="hidden md:inline">Outflows</span>
+                </button>
+                <button data-tab="savings" class="nav-item flex items-center justify-center md:justify-start flex-grow md:flex-none p-3 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors duration-200 text-xs md:text-base">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-0 md:mr-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 10H6M21 16H3M16 16v-2a4 4 0 00-4-4h-2a4 4 0 00-4 4v2m12-2h-2m-4 0v-2a4 4 0 00-4-4h-2a4 4 0 00-4 4v2" />
+                    </svg>
+                    <span class="hidden md:inline">Savings</span>
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-grow p-4 md:p-10">
+            <header class="flex justify-between items-center mb-6">
+                <h2 class="text-3xl font-bold text-gray-700" id="page-title"></h2>
+            </header>
+            
+            <div id="content-area" class="overflow-y-auto">
+                <!-- Content will be injected here by JavaScript -->
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, where, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Use provided global variables to set up the app.
+        const firebaseConfig = {
+            apiKey: "AIzaSyDDYDtyNzIWHTm7PGtTUH9BxXebcKD1GFs",
+            authDomain: "budget-tracker-4bfe4.firebaseapp.com",
+            projectId: "budget-tracker-4bfe4",
+            storageBucket: "budget-tracker-4bfe4.appspot.com",
+            messagingSenderId: "959892222386",
+            appId: "1:959892222386:web:a2e3b7e4735ef33737f4ab",
+            measurementId: "G-XQV4NVJJPE"
+        };
+
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth, userId, transactions = [];
+        let chartInstance = null;
+        let mascotInterval = null;
+        let isAuthReady = false;
+
+        // UI Elements
+        const navItems = document.querySelectorAll('.nav-item');
+        const contentArea = document.getElementById('content-area');
+        const pageTitle = document.getElementById('page-title');
+        const mascotBubble = document.getElementById('mascot-bubble');
+        const userStatus = document.getElementById('user-status');
+        
+        console.log("Firebase initialized");
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+
+        // Mascot messages to be displayed every 30 seconds
+        const mascotMessages = [
+            "You've got this!",
+            "What's your financial goal for today?",
+            "Every penny counts!",
+            "Let's check your budget!",
+            "Your savings are growing!",
+            "Stay on track!"
+        ];
+
+        function getRandomMascotMessage() {
+            return mascotMessages[Math.floor(Math.random() * mascotMessages.length)];
+        }
+
+        function startMascotInterval() {
+            if (mascotInterval) {
+                clearInterval(mascotInterval);
+            }
+            mascotInterval = setInterval(() => {
+                mascotBubble.textContent = getRandomMascotMessage();
+            }, 30000); // 30 seconds
+            mascotBubble.textContent = getRandomMascotMessage();
+        }
+
+        // Calculate totals for a given type or category
+        function calculateTotal(type, category = null) {
+            let filtered = transactions.filter(t => t.type === type);
+            if (category) {
+                filtered = filtered.filter(t => t.category === category);
+            }
+            return filtered.reduce((sum, t) => sum + t.amount, 0);
+        }
+
+        // Generate the HTML for a transaction table
+        function createTransactionTable(items) {
+            let html = `
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 rounded-lg card-shadow">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-100">
+            `;
+            if (items.length === 0) {
+                html += `
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">No transactions added yet.</td>
+                    </tr>
+                `;
+            } else {
+                items.forEach(item => {
+                    const amountColor = item.type === 'income' ? 'text-green-600' : (item.type === 'savings' ? 'text-blue-600' : 'text-red-600');
+                    html += `
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap">${item.name}</td>
+                            <td class="px-6 py-4 whitespace-nowrap font-semibold ${amountColor}">$${item.amount.toLocaleString()}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.frequency || '-'}</td>
+                            <td class="px-6 py-4 whitespace-normal text-sm text-gray-500">${item.notes || '-'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.date || '-'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                <button data-doc-id="${item.docId}" data-type="delete" class="text-gray-400 hover:text-red-500 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 11-2 0v6a1 1 0 112 0V8z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+            html += `</tbody></table></div>`;
+            return html;
+        }
+
+        // Renders the Dashboard view
+        function renderDashboard() {
+            pageTitle.textContent = 'Dashboard';
+            const totalIncome = calculateTotal('income');
+            const totalOutflows = calculateTotal('outflow');
+            const totalSavings = calculateTotal('savings');
+            const netBalance = totalIncome - totalOutflows - totalSavings;
+
+            const outflowData = [
+                { name: 'Bills', value: calculateTotal('outflow', 'Bills') },
+                { name: 'Expenses', value: calculateTotal('outflow', 'Expenses') },
+                { name: 'Debt', value: calculateTotal('outflow', 'Debt') }
+            ];
+
+            contentArea.innerHTML = `
+                <div class="space-y-6">
+                    <!-- Summary Boxes -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="bg-white rounded-xl shadow-lg p-6 text-center">
+                            <h3 class="text-gray-500 text-sm font-medium">Total Income</h3>
+                            <p class="text-2xl font-bold text-green-600 mt-1">$${totalIncome.toLocaleString()}</p>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 text-center">
+                            <h3 class="text-gray-500 text-sm font-medium">Total Outflows</h3>
+                            <p class="text-2xl font-bold text-red-600 mt-1">$${totalOutflows.toLocaleString()}</p>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 text-center">
+                            <h3 class="text-gray-500 text-sm font-medium">Total Savings</h3>
+                            <p class="text-2xl font-bold text-blue-600 mt-1">$${totalSavings.toLocaleString()}</p>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-lg p-6 text-center">
+                            <h3 class="text-gray-500 text-sm font-medium">Net Balance</h3>
+                            <p class="text-2xl font-bold text-purple-600 mt-1">$${netBalance.toLocaleString()}</p>
+                        </div>
+                    </div>
+
+                    <!-- Chart Section -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Outflow Breakdown</h3>
+                        <div class="flex justify-center items-center h-96">
+                            <canvas id="outflow-chart" class="w-full"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- All Transactions Table -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">All Transactions</h3>
+                        ${createTransactionTable(transactions)}
+                    </div>
+                </div>
+            `;
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+            if (outflowData.some(d => d.value > 0)) {
+                const ctx = document.getElementById('outflow-chart').getContext('2d');
+                chartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: outflowData.map(d => d.name),
+                        datasets: [{
+                            label: 'Outflows by Category',
+                            data: outflowData.map(d => d.value),
+                            backgroundColor: [
+                                '#F783AC', /* A soft pink */
+                                '#D2B3DB', /* Lavender */
+                                '#426BC2' /* Sapphire */
+                            ],
+                            borderColor: '#F7F4ED',
+                            borderWidth: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        cutout: '70%',
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.label}: $${context.formattedValue}`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            attachTableListeners();
+        }
+
+        // Renders the Income view
+        function renderIncome() {
+            pageTitle.textContent = 'Income';
+            const incomeTransactions = transactions.filter(t => t.type === 'income');
+            const totalIncome = calculateTotal('income');
+
+            contentArea.innerHTML = `
+                <div class="space-y-6">
+                    <!-- Total Income Box -->
+                    <div class="bg-white rounded-xl shadow-lg p-6 text-center">
+                        <h3 class="text-gray-500 text-sm font-medium">Total Income</h3>
+                        <p class="text-2xl font-bold text-green-600 mt-1">$${totalIncome.toLocaleString()}</p>
+                    </div>
+
+                    <!-- Add New Income Form -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Add New Income</h3>
+                        <form id="add-transaction-form" data-type="income" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <input type="text" name="name" list="income-sources" placeholder="Source" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" required>
+                                <datalist id="income-sources">
+                                    <option value="Salary"></option>
+                                    <option value="Freelance"></option>
+                                    <option value="Gift"></option>
+                                    <option value="Bonus"></option>
+                                </datalist>
+                                <input type="number" name="amount" placeholder="Amount" step="0.01" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" required>
+                                <select name="frequency" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                                    <option value="">Frequency (Optional)</option>
+                                    <option value="One-time">One-time</option>
+                                    <option value="Daily">Daily</option>
+                                    <option value="Weekly">Weekly</option>
+                                    <option value="Monthly">Monthly</option>
+                                    <option value="Annually">Annually</option>
+                                </select>
+                                <input type="date" name="date" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                            </div>
+                            <textarea name="notes" rows="2" placeholder="Notes" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"></textarea>
+                            <button type="submit" class="w-full bg-green-500 text-white font-bold py-3 rounded-lg shadow-md hover:bg-green-600 transition-colors">
+                                Add Income
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Income Transactions Table -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Income Transactions</h3>
+                        ${createTransactionTable(incomeTransactions)}
+                    </div>
+                </div>
+            `;
+            attachFormListeners();
+            attachTableListeners();
+        }
+
+        // Renders the Outflows view
+        function renderOutflows() {
+            pageTitle.textContent = 'Outflows';
+            const totalOutflows = calculateTotal('outflow');
+            const bills = transactions.filter(t => t.type === 'outflow' && t.category === 'Bills');
+            const expenses = transactions.filter(t => t.type === 'outflow' && t.category === 'Expenses');
+            const debt = transactions.filter(t => t.type === 'outflow' && t.category === 'Debt');
+
+            contentArea.innerHTML = `
+                <div class="space-y-6">
+                    <!-- Total Outflows Box -->
+                    <div class="bg-white rounded-xl shadow-lg p-6 text-center">
+                        <h3 class="text-gray-500 text-sm font-medium">Total Outflows</h3>
+                        <p class="text-2xl font-bold text-red-600 mt-1">$${totalOutflows.toLocaleString()}</p>
+                    </div>
+
+                    <!-- Add New Outflow Form -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Add New Outflow</h3>
+                        <form id="add-transaction-form" data-type="outflow" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <input type="text" name="name" list="outflow-items" placeholder="Item" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500" required>
+                                <datalist id="outflow-items">
+                                    <option value="Rent"></option>
+                                    <option value="Groceries"></option>
+                                    <option value="Utilities"></option>
+                                    <option value="Dining"></option>
+                                    <option value="Entertainment"></option>
+                                </datalist>
+                                <input type="number" name="amount" placeholder="Amount" step="0.01" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500" required>
+                                <select name="category" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500" required>
+                                    <option value="">Select Category</option>
+                                    <option value="Bills">Bills</option>
+                                    <option value="Expenses">Expenses</option>
+                                    <option value="Debt">Debt</option>
+                                </select>
+                                <select name="frequency" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+                                    <option value="">Frequency (Optional)</option>
+                                    <option value="One-time">One-time</option>
+                                    <option value="Daily">Daily</option>
+                                    <option value="Weekly">Weekly</option>
+                                    <option value="Monthly">Monthly</option>
+                                    <option value="Annually">Annually</option>
+                                </select>
+                            </div>
+                            <input type="date" name="date" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+                            <textarea name="notes" rows="2" placeholder="Notes" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"></textarea>
+                            <button type="submit" class="w-full bg-red-500 text-white font-bold py-3 rounded-lg shadow-md hover:bg-red-600 transition-colors">
+                                Add Outflow
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Outflow Sections -->
+                    <div class="grid grid-cols-1 gap-6">
+                    <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col">
+                        <h4 class="font-semibold text-lg text-gray-700 mb-2">
+                        Bills <span class="text-sm font-normal text-gray-500">
+                        ($${calculateTotal('outflow', 'Bills').toLocaleString()})
+                        </span>
+                        </h4>
+                        ${createTransactionTable(bills)}
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col">
+                        <h4 class="font-semibold text-lg text-gray-700 mb-2">
+                        Expenses <span class="text-sm font-normal text-gray-500">
+                        ($${calculateTotal('outflow', 'Expenses').toLocaleString()})
+                        </span>
+                        </h4>
+                        ${createTransactionTable(expenses)}
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col">
+                        <h4 class="font-semibold text-lg text-gray-700 mb-2">
+                        Debt <span class="text-sm font-normal text-gray-500">
+                        ($${calculateTotal('outflow', 'Debt').toLocaleString()})
+                        </span>
+                        </h4>
+                        ${createTransactionTable(debt)}
+                    </div>
+                    </div>
+                </div>
+            `;
+            attachFormListeners();
+            attachTableListeners();
+        }
+
+        // Renders the Savings view
+        function renderSavings() {
+            pageTitle.textContent = 'Savings';
+            const savingsTransactions = transactions.filter(t => t.type === 'savings');
+            const totalSavings = calculateTotal('savings');
+
+            contentArea.innerHTML = `
+                <div class="space-y-6">
+                    <!-- Total Savings Box -->
+                    <div class="bg-white rounded-xl shadow-lg p-6 text-center">
+                        <h3 class="text-gray-500 text-sm font-medium">Total Savings</h3>
+                        <p class="text-2xl font-bold text-blue-600 mt-1">$${totalSavings.toLocaleString()}</p>
+                    </div>
+                    
+                    <!-- Add New Savings Form -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Add New Savings</h3>
+                        <form id="add-transaction-form" data-type="savings" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <input type="text" name="name" list="savings-items" placeholder="Item" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                <datalist id="savings-items">
+                                    <option value="Emergency Fund"></option>
+                                    <option value="Vacation Fund"></option>
+                                    <option value="Retirement"></option>
+                                    <option value="New Car Fund"></option>
+                                </datalist>
+                                <input type="number" name="amount" placeholder="Amount" step="0.01" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                                <select name="frequency" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Frequency (Optional)</option>
+                                    <option value="One-time">One-time</option>
+                                    <option value="Daily">Daily</option>
+                                    <option value="Weekly">Weekly</option>
+                                    <option value="Monthly">Monthly</option>
+                                    <option value="Annually">Annually</option>
+                                </select>
+                                <input type="date" name="date" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <textarea name="notes" rows="2" placeholder="Notes" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                            <button type="submit" class="w-full bg-blue-500 text-white font-bold py-3 rounded-lg shadow-md hover:bg-blue-600 transition-colors">
+                                Add Savings
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Savings Accounts Table -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Savings Accounts</h3>
+                        ${createTransactionTable(savingsTransactions)}
+                    </div>
+                </div>
+            `;
+            attachFormListeners();
+            attachTableListeners();
+        }
+
+        // Handle adding a new transaction to Firestore
+        async function handleAddTransaction(event) {
+            event.preventDefault();
+            const form = event.target;
+            const type = form.dataset.type;
+            const newTransaction = {
+                name: form.elements.name.value,
+                amount: parseFloat(form.elements.amount.value),
+                type: type,
+                category: form.elements.category ? form.elements.category.value : form.elements.name.value,
+                frequency: form.elements.frequency.value || 'One-time',
+                notes: form.elements.notes.value,
+                date: form.elements.date.value || new Date().toISOString().slice(0, 10),
+                createdAt: new Date()
+            };
+            try {
+                const transactionsRef = collection(db, 'artifacts', appId, 'users', userId, 'transactions');
+                await addDoc(transactionsRef, newTransaction);
+                form.reset();
+            } catch (e) {
+                console.error("Error adding document: ", e);
+            }
+        }
+
+        // Handle deleting a transaction from Firestore
+        async function handleDeleteTransaction(event) {
+            const button = event.target.closest('button[data-type="delete"]');
+            if (button) {
+                const docId = button.dataset.docId;
+                try {
+                    const transactionRef = doc(db, 'artifacts', appId, 'users', userId, 'transactions', docId);
+                    await deleteDoc(transactionRef);
+                } catch (e) {
+                    console.error("Error deleting document: ", e);
+                }
+            }
+        }
+
+        // Attach event listeners for forms and tables
+        function attachFormListeners() {
+            const form = document.getElementById('add-transaction-form');
+            if (form) {
+                form.addEventListener('submit', handleAddTransaction);
+            }
+        }
+
+        function attachTableListeners() {
+            const tables = contentArea.querySelectorAll('table');
+            tables.forEach(table => {
+                table.addEventListener('click', handleDeleteTransaction);
+            });
+        }
+        
+        // Listen for real-time updates from Firestore
+        function listenForTransactions() {
+            if (!isAuthReady || !userId) return;
+
+            const transactionsRef = collection(db, 'artifacts', appId, 'users', userId, 'transactions');
+            onSnapshot(transactionsRef, (snapshot) => {
+                transactions = snapshot.docs.map(doc => ({
+                    docId: doc.id,
+                    ...doc.data()
+                }));
+                // Get the current active tab or default to 'dashboard'
+                const activeTabElement = document.querySelector('.nav-item.active');
+                const currentTab = activeTabElement ? activeTabElement.dataset.tab : 'dashboard';
+                renderTab(currentTab);
+            });
+        }
+
+        // Function to render the active tab
+        function renderTab(tab) {
+            // Remove active state from all nav items
+            navItems.forEach(item => item.classList.remove('active'));
+            
+            // Add active state to the selected nav item
+            const activeNav = document.querySelector(`[data-tab="${tab}"]`);
+            if (activeNav) {
+                activeNav.classList.add('active');
+            }
+
+            // Render the content for the selected tab
+            switch (tab) {
+                case 'dashboard':
+                    renderDashboard();
+                    break;
+                case 'income':
+                    renderIncome();
+                    break;
+                case 'outflows':
+                    renderOutflows();
+                    break;
+                case 'savings':
+                    renderSavings();
+                    break;
+            }
+        }
+
+        // Event listeners for navigation
+        navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                renderTab(item.dataset.tab);
+            });
+        });
+
+        // Initial setup
+        document.addEventListener('DOMContentLoaded', async () => {
+            startMascotInterval();
+            try {
+                if (initialAuthToken) {
+                    const userCredential = await signInWithCustomToken(auth, initialAuthToken);
+                    userId = userCredential.user.uid;
+                } else {
+                    const userCredential = await signInAnonymously(auth);
+                    userId = userCredential.user.uid;
+                }
+                userStatus.textContent = `User ID: ${userId}`;
+                isAuthReady = true;
+                // Render the initial dashboard after authentication is ready
+                renderTab('dashboard');
+                listenForTransactions();
+            } catch (error) {
+                console.error("Firebase auth error:", error);
+                userStatus.textContent = 'Error: Could not authenticate.';
+            }
+        });
+        
+    </script>
+
+</body>
+</html>
