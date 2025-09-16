@@ -6,9 +6,9 @@
     <title>Finarium Budget Tracker</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js CDN for charts -->
+    <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Firebase CDN scripts for a full-stack application -->
+    <!-- Firebase CDN scripts -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -109,7 +109,6 @@
             </header>
             
             <div id="content-area" class="overflow-y-auto">
-                <!-- Content will be injected here by JavaScript -->
             </div>
         </main>
     </div>
@@ -119,7 +118,7 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, where, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // Use provided global variables to set up the app.
+        // Firebase configuration.
         const firebaseConfig = {
             apiKey: "AIzaSyDDYDtyNzIWHTm7PGtTUH9BxXebcKD1GFs",
             authDomain: "budget-tracker-4bfe4.firebaseapp.com",
@@ -297,7 +296,7 @@
                             label: 'Outflows by Category',
                             data: outflowData.map(d => d.value),
                             backgroundColor: [
-                                '#F783AC', /* A soft pink */
+                                '#F783AC', /* soft pink */
                                 '#D2B3DB', /* Lavender */
                                 '#426BC2' /* Sapphire */
                             ],
@@ -655,3 +654,4 @@
 
 </body>
 </html>
+
